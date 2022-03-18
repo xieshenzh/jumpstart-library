@@ -1,3 +1,4 @@
 trino
 psycopg2
 sqlalchemy
+pyservicebinding

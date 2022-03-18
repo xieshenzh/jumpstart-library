@@ -17,7 +17,7 @@ spec:
     sourceStrategy:
       from:
         kind: DockerImage
-        name: "registry.access.redhat.com/ubi8/python-38:latest"
+        name: "registry.access.redhat.com/ubi8/python-39:latest"
   postCommit: {}
   source:
     type: Git

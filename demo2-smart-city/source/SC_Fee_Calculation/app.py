@@ -2,6 +2,7 @@ import trino
 from sqlalchemy import create_engine,MetaData
 #from sqlalchemy.dialects import postgresql
 import sqlalchemy as db
+from pyservicebinding import binding
 import os
 from datetime import datetime, timedelta
 
@@ -82,7 +83,7 @@ def trino_execute_query(trino_query):
 
 def main():
     ## Database connection string
-    engine = db.create_engine('postgresql://'+DB_USER+':'+DB_PASSWORD+'@'+DB_HOST+'/'+DB_NAME, connect_args={})
+    engine = db.create_engine('postgresql://'+DB_USER+':'+DB_PASSWORD+'@'+DB_HOST+':'+DB_PORT+'/'+DB_NAME, connect_args={})
     connection = engine.connect()
     metadata = db.MetaData()
 
@@ -114,12 +115,34 @@ if __name__ == "__main__":
     POLLUTION_FEE = os.getenv('POLLUTION_FEE', 5)
     BATCH_TIME_MINS = os.getenv('BATCH_TIME_MINS', 5)
 
-    DB_USER = os.getenv('DB_USER', 'dbadmin')
-    DB_PASSWORD = os.getenv('DB_PASSWORD', 'dbpassword')
-    DB_HOST = os.getenv('DB_HOST', '127.0.0.1')
-    DB_NAME = os.getenv('DB_NAME','pgdb')
-    TABLE_EVENT = os.getenv('TABLE_EVENT','event')
-    TABLE_VEHICLE_METADATA = os.getenv('TABLE_VEHICLE_METADATA','vehicle_metadata')
+    try:
+        sb = binding.ServiceBinding()
+        pg_list = sb.bindings("postgresql")
+        if len(pg_list) > 0:
+            print("Use service binding")
+            pg = pg_list[0]
+            DB_USER = pg["username"]
+            DB_PASSWORD = pg["password"]
+            DB_NAME = pg["database"]
+            DB_HOST = pg["host"]
+            DB_PORT = pg["port"]
+        else:
+            print("No service binding for Postgresql")
+            DB_USER = os.getenv('DB_USER', 'dbadmin')
+            DB_PASSWORD = os.getenv('DB_PASSWORD', 'dbpassword')
+            DB_HOST = os.getenv('DB_HOST', '127.0.0.1')
+            DB_PORT = os.getenv('DB_PORT', '5432')
+            DB_NAME = os.getenv('DB_NAME', 'pgdb')
+    except binding.ServiceBindingRootMissingError as msg:
+        # log the error message and retry/exit
+        print("SERVICE_BINDING_ROOT env var not set")
+        DB_USER = os.getenv('DB_USER', 'dbadmin')
+        DB_PASSWORD = os.getenv('DB_PASSWORD', 'dbpassword')
+        DB_HOST = os.getenv('DB_HOST', '127.0.0.1')
+        DB_PORT = os.getenv('DB_PORT', '5432')
+        DB_NAME = os.getenv('DB_NAME', 'pgdb')
+    TABLE_EVENT = os.getenv('TABLE_EVENT', 'event')
+    TABLE_VEHICLE_METADATA = os.getenv('TABLE_VEHICLE_METADATA', 'vehicle_metadata')
     ## Trino connection details
     TRINO_ENDPOINT = os.getenv('TRINO_ENDPOINT', '127.0.0.1')
     TRINO_PORT = os.getenv('TRINO_PORT', '8080')

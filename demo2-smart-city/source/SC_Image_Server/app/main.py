@@ -11,21 +11,44 @@ from fastapi.responses import HTMLResponse
 
 from sqlalchemy import create_engine,MetaData
 import sqlalchemy as db
+from pyservicebinding import binding
 
 # Images on local S3
 service_point = os.environ['SERVICE_POINT']
 bucket_name = os.environ['BUCKET_NAME']
 
 ## Database details and connection
-DB_USER = os.getenv('DB_USER', 'dbadmin')
-DB_PASSWORD = os.getenv('DB_PASSWORD', 'HT@1202k')
-DB_HOST = os.getenv('DB_HOST', '127.0.0.1')
-DB_NAME = os.getenv('DB_NAME','pgdb')
+try:
+    sb = binding.ServiceBinding()
+    pg_list = sb.bindings("postgresql")
+    if len(pg_list) > 0:
+        print("Use service binding")
+        pg = pg_list[0]
+        DB_USER = pg["username"]
+        DB_PASSWORD = pg["password"]
+        DB_NAME = pg["database"]
+        DB_HOST = pg["host"]
+        DB_PORT = pg["port"]
+    else:
+        print("No service binding for Postgresql")
+        DB_USER = os.getenv('DB_USER', 'dbadmin')
+        DB_PASSWORD = os.getenv('DB_PASSWORD', 'HT@1202k')
+        DB_HOST = os.getenv('DB_HOST', '127.0.0.1')
+        DB_PORT = os.getenv('DB_PORT', '5432')
+        DB_NAME = os.getenv('DB_NAME', 'pgdb')
+except binding.ServiceBindingRootMissingError as msg:
+    # log the error message and retry/exit
+    print("SERVICE_BINDING_ROOT env var not set")
+    DB_USER = os.getenv('DB_USER', 'dbadmin')
+    DB_PASSWORD = os.getenv('DB_PASSWORD', 'HT@1202k')
+    DB_HOST = os.getenv('DB_HOST', '127.0.0.1')
+    DB_PORT = os.getenv('DB_PORT', '5432')
+    DB_NAME = os.getenv('DB_NAME', 'pgdb')
 TABLE_NAME = os.getenv('TABLE_NAME','event')
 
 def get_last_image():
     """Retrieves the last uploaded image according to helper database timestamp."""
-    engine = db.create_engine('postgresql://'+DB_USER+':'+DB_PASSWORD+'@'+DB_HOST+'/'+DB_NAME,  pool_pre_ping=True)
+    engine = db.create_engine('postgresql://'+DB_USER+':'+DB_PASSWORD+'@'+DB_HOST+':'+DB_PORT+'/'+DB_NAME,  pool_pre_ping=True)
     connection = engine.connect()
     metadata = db.MetaData()
     event = db.Table('event',metadata, autoload=True, autoload_with=engine)

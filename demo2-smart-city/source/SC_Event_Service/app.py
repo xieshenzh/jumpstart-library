@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine, Column, Integer, String, Numeric, DateTime, func, Boolean
 from sqlalchemy.ext.declarative import declarative_base
+from pyservicebinding import binding
 from aiokafka import AIOKafkaConsumer
 import asyncio, os, ast , sys
 import nest_asyncio
@@ -12,10 +13,32 @@ KAFKA_CONSUMER_GROUP_ID = os.getenv('KAFKA_CONSUMER_GROUP_ID', 'event_consumer_g
 loop = asyncio.get_event_loop()
 
 ## Database details and connection
-DB_USER = os.getenv('DB_USER', 'dbadmin')
-DB_PASSWORD = os.getenv('DB_PASSWORD', 'HT@1202k')
-DB_HOST = os.getenv('DB_HOST', '127.0.0.1')
-DB_NAME = os.getenv('DB_NAME','pgdb')
+try:
+    sb = binding.ServiceBinding()
+    pg_list = sb.bindings("postgresql")
+    if len(pg_list) > 0:
+        print("Use service binding")
+        pg = pg_list[0]
+        DB_USER = pg["username"]
+        DB_PASSWORD = pg["password"]
+        DB_NAME = pg["database"]
+        DB_HOST = pg["host"]
+        DB_PORT = pg["port"]
+    else:
+        print("No service binding for Postgresql")
+        DB_USER = os.getenv('DB_USER', 'dbadmin')
+        DB_PASSWORD = os.getenv('DB_PASSWORD', 'HT@1202k')
+        DB_HOST = os.getenv('DB_HOST', '127.0.0.1')
+        DB_PORT = os.getenv('DB_PORT', '5432')
+        DB_NAME = os.getenv('DB_NAME', 'pgdb')
+except binding.ServiceBindingRootMissingError as msg:
+    # log the error message and retry/exit
+    print("SERVICE_BINDING_ROOT env var not set")
+    DB_USER = os.getenv('DB_USER', 'dbadmin')
+    DB_PASSWORD = os.getenv('DB_PASSWORD', 'HT@1202k')
+    DB_HOST = os.getenv('DB_HOST', '127.0.0.1')
+    DB_PORT = os.getenv('DB_PORT', '5432')
+    DB_NAME = os.getenv('DB_NAME', 'pgdb')
 TABLE_NAME = os.getenv('TABLE_NAME','event')
 
 Base = declarative_base()
@@ -36,7 +59,7 @@ class Event(Base):
     stationb504 = Column(Boolean, unique=False)
 
 async def consume():
-    engine = create_engine('postgresql://'+DB_USER+':'+DB_PASSWORD+'@'+DB_HOST+'/'+DB_NAME+'?tcp_user_timeout=3000&connect_timeout=10', pool_pre_ping=True, connect_args={})
+    engine = create_engine('postgresql://'+DB_USER+':'+DB_PASSWORD+'@'+DB_HOST+':'+DB_PORT+'/'+DB_NAME+'?tcp_user_timeout=3000&connect_timeout=10', pool_pre_ping=True, connect_args={})
     connection = engine.connect()
 
     kafkaConsumer = AIOKafkaConsumer(KAFKA_TOPIC, loop=loop, bootstrap_servers=KAFKA_ENDPOINT, group_id=KAFKA_CONSUMER_GROUP_ID)

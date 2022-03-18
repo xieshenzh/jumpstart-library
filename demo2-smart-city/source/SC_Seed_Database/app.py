@@ -1,18 +1,41 @@
 from sqlalchemy import create_engine, Column, Integer, String, Sequence
 from sqlalchemy.ext.declarative import declarative_base
+from pyservicebinding import binding
 import json, urllib.request
 import os, sys
 
 DB_URL = os.getenv('VEHICLE_METADATA_DB_URL', 'https://raw.githubusercontent.com/red-hat-data-services/jumpstart-library/main/demo2-smart-city/source/SC_Seed_Database/vehicle_metadata_db.json')
 
 ## Database details and connection
-DB_USER = os.getenv('DB_USER', 'dbadmin')
-DB_PASSWORD = os.getenv('DB_PASSWORD', 'dbpassword')
-DB_HOST = os.getenv('DB_HOST', '127.0.0.1')
-DB_NAME = os.getenv('DB_NAME','pgdb')
-TABLE_NAME = os.getenv('TABLE_NAME','vehicle_metadata')
+try:
+    sb = binding.ServiceBinding()
+    pg_list = sb.bindings("postgresql")
+    if len(pg_list) > 0:
+        print("Use service binding")
+        pg = pg_list[0]
+        DB_USER = pg["username"]
+        DB_PASSWORD = pg["password"]
+        DB_NAME = pg["database"]
+        DB_HOST = pg["host"]
+        DB_PORT = pg["port"]
+    else:
+        print("No service binding for Postgresql")
+        DB_USER = os.getenv('DB_USER', 'dbadmin')
+        DB_PASSWORD = os.getenv('DB_PASSWORD', 'dbpassword')
+        DB_HOST = os.getenv('DB_HOST', '127.0.0.1')
+        DB_PORT = os.getenv('DB_PORT', '5432')
+        DB_NAME = os.getenv('DB_NAME', 'pgdb')
+except binding.ServiceBindingRootMissingError as msg:
+    # log the error message and retry/exit
+    print("SERVICE_BINDING_ROOT env var not set")
+    DB_USER = os.getenv('DB_USER', 'dbadmin')
+    DB_PASSWORD = os.getenv('DB_PASSWORD', 'dbpassword')
+    DB_HOST = os.getenv('DB_HOST', '127.0.0.1')
+    DB_PORT = os.getenv('DB_PORT', '5432')
+    DB_NAME = os.getenv('DB_NAME', 'pgdb')
+TABLE_NAME = os.getenv('TABLE_NAME', 'vehicle_metadata')
 
-engine = create_engine('postgresql://'+DB_USER+':'+DB_PASSWORD+'@'+DB_HOST+'/'+DB_NAME, connect_args={})
+engine = create_engine('postgresql://'+DB_USER+':'+DB_PASSWORD+'@'+DB_HOST+':'+DB_PORT+'/'+DB_NAME, connect_args={})
 Base = declarative_base()
 TABLE_ID = Sequence(TABLE_NAME+'_id_seq', start=1000)
 
